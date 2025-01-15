@@ -1,23 +1,42 @@
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
+import requests
 
+from config.prefectures import prefecture_numbers
+
+
+ValidInputResolution = Literal['l', 'low', 'i', 'medium', 'h', 'high', 'f', 'full']
+ResolutionCode = Literal['l', 'i', 'h', 'f']
+resolution_code_mapping = {
+    'low': 'l',
+    'medium': 'i',
+    'high': 'h',
+    'full': 'f',
+}
 
 
 def prefecture_heatmap(
         prefecture: str,
         data: pd.DataFrame,
-        year: int = 2022,
-        resolution: str = 'high',
+        year: int = 2023,
+        resolution: ValidInputResolution = 'h',
         auto_cache: bool = True,
-        save_path: Path | str | bool = False,
+        save: bool = False,
+        save_path: Path | str = 'plot',
         cache_dir: str = 'cache',
         **kwargs,
 ) -> None:
     ''''''
-    cache_path = Path(cache_dir, f'{year}', f'{prefecture}.png')
+    if resolution in resolution_code_mapping:
+        resolution = resolution_code_mapping[resolution]
+    elif resolution not in resolution_code_mapping.values():
+        raise ValueError(f'Invalid resolution ({resolution})')
+
+    cache_path = Path(cache_dir, f'{year}', f'{prefecture}_{resolution}.png')
     if cache_path.is_file():
-        try_loading_cache(cache_path)
+        load_cache(cache_path)
     else:
         download_map(prefecture, year, resolution)
         if auto_cache:
@@ -26,16 +45,28 @@ def prefecture_heatmap(
     cleaned_data = clean_data(data)
     validate_data(cleaned_data)
     create_plot(cleaned_data)
-    if save_path:
+    if save:
         save_plot(Path(save_path))
 
 
-def try_loading_cache(cache_path: Path) -> None:
+def load_cache(cache_path: Path) -> None:
     ...
 
 
-def download_map(prefecture: str, year: int, resolution: str) -> None:
-    ...
+def download_map(
+        prefecture: str,
+        year: int,
+        resolution: str,
+) -> None:
+    if resolution == 'high':
+        res = 'h'
+    else:
+        resolution = 'i'
+    pref = prefecture_numbers[prefecture]
+    url = download_url(year, pref, res)
+    with open('test.topojson', 'wb') as f:
+        response = requests.get(url)
+        f.write(response.content)
 
 
 def cache_map() -> None:
@@ -57,3 +88,14 @@ def create_plot(data: pd.DataFrame) -> None:
 def save_plot(save_path: Path) -> None:
     ...
 
+
+def download_url(
+        year: int,
+        pref: str,
+        res: ResolutionCode,
+) -> str:
+    ''''''
+    return (
+        f'https://geoshape.ex.nii.ac.jp/city/topojson/{year}0101/{pref}/{pref}_city.'
+        f'{res}.topojson'
+    )
