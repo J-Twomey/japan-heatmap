@@ -29,11 +29,7 @@ def prefecture_heatmap(
         **kwargs,
 ) -> None:
     ''''''
-    if resolution in resolution_code_mapping:
-        resolution = resolution_code_mapping[resolution]
-    elif resolution not in resolution_code_mapping.values():
-        raise ValueError(f'Invalid resolution ({resolution})')
-
+    resolution = get_resolution(resolution)
     cache_path = Path(cache_dir, f'{year}', f'{prefecture}_{resolution}.png')
     if cache_path.is_file():
         load_cache(cache_path)
@@ -47,6 +43,21 @@ def prefecture_heatmap(
     create_plot(cleaned_data)
     if save:
         save_plot(Path(save_path))
+
+
+def get_resolution(
+        res: str,
+        resolution_map: dict[str, str] = resolution_code_mapping,
+) -> str:
+    '''
+    Get resolution from the given mapping. Priotises values of the dict first.
+    '''
+    if res in resolution_map.values():
+        return res
+    elif res in resolution_map:
+        return resolution_map[res]
+    else:
+        raise ValueError(f'Invalid resolution: {res}')
 
 
 def load_cache(cache_path: Path) -> None:
@@ -96,6 +107,6 @@ def download_url(
 ) -> str:
     ''''''
     return (
-        f'https://geoshape.ex.nii.ac.jp/city/topojson/{year}0101/{pref}/{pref}_city.'
+        f'https://geoshape.ex.nii.ac.jp/city/topojson/{year}0101/{pref:>02}/{pref:>02}_city.'
         f'{res}.topojson'
     )
