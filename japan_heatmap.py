@@ -54,18 +54,18 @@ def prefecture_heatmap(
     )
     if file_cache_path.is_file():
         print('loading map from cache')
-        map_data: pd.DataFrame = gpd.read_file(file_cache_path)
+        map_geometry: pd.DataFrame = gpd.read_file(file_cache_path)
     else:
         print('downloading map')
-        map_data = download_map(prefecture_num, year, resolution)
-        map_data.crs = crs
-        map_data = clean_map_data(map_data)
+        map_geometry = download_map(prefecture_num, year, resolution)
+        map_geometry.crs = crs
+        map_geometry = clean_map_data(map_geometry)
         if auto_cache:
-            cache_map(map_data, file_cache_path, crs)
+            cache_map(map_geometry, file_cache_path, crs)
 
     cleaned_data = clean_data(data)
     cleaned_data = validate_data(cleaned_data)
-    merged_data = merge_data(map_data, cleaned_data, district_column)
+    merged_data = merge_data(map_geometry, cleaned_data, district_column)
     plot = create_plot(merged_data, heatmap_column)
     if save:
         if save_name is None:
@@ -86,10 +86,6 @@ def get_resolution(
         return resolution_map[res]
     else:
         raise ValueError(f'Invalid resolution: {res}')
-
-
-def load_cache(cache_path: Path) -> None:
-    ...
 
 
 def download_map(

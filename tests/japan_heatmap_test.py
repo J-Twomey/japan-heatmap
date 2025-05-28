@@ -1,6 +1,9 @@
 import pytest
 
-import japan_heatmap as jpnh
+from japan_heatmap import(
+    download_url,
+    get_resolution,
+)
 
 
 @pytest.mark.parametrize(
@@ -19,7 +22,7 @@ def test_get_resolution(
         'value': 'v',
         'v': 'bad_value',
     }
-    return_resolution = jpnh.get_resolution(resolution, resolution_map=mapping)
+    return_resolution = get_resolution(resolution, resolution_map=mapping)
     assert return_resolution == expected
 
 
@@ -28,7 +31,7 @@ def test_get_resolution_error_case() -> None:
     mapping = {'value': 'v'}
     resolution = 'invalid'
     with pytest.raises(ValueError, match='Invalid resolution: invalid'):
-        jpnh.get_resolution(resolution, resolution_map=mapping)
+        get_resolution(resolution, resolution_map=mapping)
 
 
 def test_download_url() -> None:
@@ -37,5 +40,5 @@ def test_download_url() -> None:
     pref = 5
     res = 'h'
     expected = 'https://geoshape.ex.nii.ac.jp/city/topojson/20050101/05/05_city.h.topojson'
-    actual = jpnh.download_url(year, pref, res)
+    actual = download_url(year, pref, res)
     assert actual == expected
