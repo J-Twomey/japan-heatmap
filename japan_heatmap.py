@@ -5,6 +5,7 @@ from pathlib import Path
 import geopandas as gpd
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import requests
 
@@ -70,6 +71,51 @@ def prefecture_heatmap(
     if save:
         if save_name is None:
             save_name = create_save_name(prefecture, year)
+        save_plot(plot, Path(save_path) / save_name)
+
+
+def prefecture_random_heatmap(
+        prefecture: str,
+        year: int = 2023,
+        resolution: str = 'h',
+        auto_cache: bool = True,
+        save: bool = False,
+        save_path: Path | str = 'plot',
+        save_name: str | None = None,
+        cache_dir: str = 'cache',
+        crs: str = 'EPSG:6668',
+        **kwargs,
+) -> None:
+    '''
+    Generate random heatmap for the given prefecture.
+    '''
+    resolution = get_resolution(resolution)
+    if prefecture not in prefecture_numbers:
+        raise ValueError(f'Provided prefecture {prefecture} is not recognised')
+    else:
+        prefecture_num = prefecture_numbers[prefecture]
+    file_cache_path = Path(
+        cache_dir,
+        f'{year}',
+        f'{resolution}',
+        f'{prefecture_num}_{resolution}.geojson',
+    )
+    if file_cache_path.is_file():
+        print('loading map from cache')
+        map_geometry: pd.DataFrame = gpd.read_file(file_cache_path)
+    else:
+        print('downloading map')
+        map_geometry = download_map(prefecture_num, year, resolution)
+        map_geometry.crs = crs
+        map_geometry = clean_map_data(map_geometry)
+        if auto_cache:
+            cache_map(map_geometry, file_cache_path, crs)
+
+    random_added_data = add_random_values(map_geometry)
+    plot = create_plot(random_added_data, 'Random_Values')
+    if save:
+        if save_name is None:
+            save_name = create_save_name(prefecture, year, random_data=True)
         save_plot(plot, Path(save_path) / save_name)
 
 
@@ -164,9 +210,13 @@ def create_plot(
 def create_save_name(
         prefecture: str,
         year: int,
+        random_data: bool = False,
 ) -> str:
     create_time = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_%H%M%S')
-    return f'{create_time}_{prefecture}_{year}.png'
+    if random_data:
+        return f'{create_time}_{prefecture}_{year}_random.png'
+    else:
+        return f'{create_time}_{prefecture}_{year}.png'
 
 
 def save_plot(
@@ -187,3 +237,11 @@ def download_url(
         f'https://geoshape.ex.nii.ac.jp/city/topojson/{year}0101/{pref:>02}/{pref:>02}_city.'
         f'{res}.topojson'
     )
+
+
+def add_random_values(
+        data: gpd.GeoDataFrame,
+        add_col: str = 'Random_Values',
+) -> gpd.GeoDataFrame:
+    data[add_col] = np.random.rand(len(data))
+    return data
