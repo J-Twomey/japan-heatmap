@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
+from pyproj.crs import CRS
 
 from config.prefectures import prefecture_numbers
 
@@ -55,11 +56,11 @@ def prefecture_heatmap(
     )
     if file_cache_path.is_file():
         print('loading map from cache')
-        map_geometry: pd.DataFrame = gpd.read_file(file_cache_path)
+        map_geometry = gpd.read_file(file_cache_path)
     else:
         print('downloading map')
         map_geometry = download_map(prefecture_num, year, resolution)
-        map_geometry.crs = crs
+        map_geometry.crs = CRS.from_user_input(crs)
         map_geometry = clean_map_data(map_geometry)
         if auto_cache:
             cache_map(map_geometry, file_cache_path, crs)
@@ -67,7 +68,7 @@ def prefecture_heatmap(
     cleaned_data = clean_data(data)
     cleaned_data = validate_data(cleaned_data)
     merged_data = merge_data(map_geometry, cleaned_data, district_column)
-    plot = create_plot(merged_data, heatmap_column)
+    plot = create_plot(merged_data, heatmap_column, **kwargs)
     if save:
         if save_name is None:
             save_name = create_save_name(prefecture, year)
@@ -102,17 +103,17 @@ def prefecture_random_heatmap(
     )
     if file_cache_path.is_file():
         print('loading map from cache')
-        map_geometry: pd.DataFrame = gpd.read_file(file_cache_path)
+        map_geometry = gpd.read_file(file_cache_path)
     else:
         print('downloading map')
         map_geometry = download_map(prefecture_num, year, resolution)
-        map_geometry.crs = crs
+        map_geometry.crs = CRS.from_user_input(crs)
         map_geometry = clean_map_data(map_geometry)
         if auto_cache:
             cache_map(map_geometry, file_cache_path, crs)
 
     random_added_data = add_random_values(map_geometry)
-    plot = create_plot(random_added_data, 'Random_Values')
+    plot = create_plot(random_added_data, 'Random_Values', **kwargs)
     if save:
         if save_name is None:
             save_name = create_save_name(prefecture, year, random_data=True)
@@ -192,6 +193,7 @@ def merge_data(
 def create_plot(
         plot_data: gpd.GeoDataFrame,
         plot_col: str,
+        **kwargs,
 ) -> plt.Figure:
     min_value = plot_data[plot_col].min()
     max_value = plot_data[plot_col].max()
@@ -201,7 +203,7 @@ def create_plot(
 
     fig, ax = plt.subplots()
     plot_data[plot_col] = plot_data[plot_col].fillna(min_value - 1)
-    plot_data.plot(ax=ax, edgecolor='k', lw=1, column=plot_col, cmap=cmap, norm=norm)
+    plot_data.plot(ax=ax, edgecolor='k', lw=1, column=plot_col, cmap=cmap, norm=norm, **kwargs)
     ax.set_axis_off()
     plt.show()
     return fig
