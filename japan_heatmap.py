@@ -43,28 +43,7 @@ def prefecture_heatmap(
     - Japanese kanji name (e.g. 秋田 or 秋田県)
     - Japanese hiragana name (e.g. あきた or あきたけん)
     '''
-    resolution = get_resolution(resolution)
-    if prefecture not in prefecture_numbers:
-        raise ValueError(f'Provided prefecture {prefecture} is not recognised')
-    else:
-        prefecture_num = prefecture_numbers[prefecture]
-    file_cache_path = Path(
-        cache_dir,
-        f'{year}',
-        f'{resolution}',
-        f'{prefecture_num}_{resolution}.geojson',
-    )
-    if file_cache_path.is_file():
-        print('loading map from cache')
-        map_geometry = gpd.read_file(file_cache_path)
-    else:
-        print('downloading map')
-        map_geometry = download_map(prefecture_num, year, resolution)
-        map_geometry.crs = CRS.from_user_input(crs)
-        map_geometry = clean_map_data(map_geometry)
-        if auto_cache:
-            cache_map(map_geometry, file_cache_path, crs)
-
+    map_geometry = get_map_geometry(prefecture, year, resolution, auto_cache, cache_dir, crs)
     cleaned_data = clean_data(data)
     cleaned_data = validate_data(cleaned_data)
     merged_data = merge_data(map_geometry, cleaned_data, district_column)
@@ -90,6 +69,23 @@ def prefecture_random_heatmap(
     '''
     Generate random heatmap for the given prefecture.
     '''
+    map_geometry = get_map_geometry(prefecture, year, resolution, auto_cache, cache_dir, crs)
+    random_added_data = add_random_values(map_geometry)
+    plot = create_plot(random_added_data, 'Random_Values', **kwargs)
+    if save:
+        if save_name is None:
+            save_name = create_save_name(prefecture, year, random_data=True)
+        save_plot(plot, Path(save_path) / save_name)
+
+
+def get_map_geometry(
+        prefecture: str,
+        year: int,
+        resolution: str,
+        auto_cache: bool,
+        cache_dir: str,
+        crs: str,
+) -> gpd.GeoDataFrame:
     resolution = get_resolution(resolution)
     if prefecture not in prefecture_numbers:
         raise ValueError(f'Provided prefecture {prefecture} is not recognised')
@@ -111,13 +107,7 @@ def prefecture_random_heatmap(
         map_geometry = clean_map_data(map_geometry)
         if auto_cache:
             cache_map(map_geometry, file_cache_path, crs)
-
-    random_added_data = add_random_values(map_geometry)
-    plot = create_plot(random_added_data, 'Random_Values', **kwargs)
-    if save:
-        if save_name is None:
-            save_name = create_save_name(prefecture, year, random_data=True)
-        save_plot(plot, Path(save_path) / save_name)
+    return map_geometry
 
 
 def get_resolution(
@@ -193,17 +183,32 @@ def merge_data(
 def create_plot(
         plot_data: gpd.GeoDataFrame,
         plot_col: str,
+        use_defaults: bool = True,
+        colour_for_na: str = 'darkgray',
         **kwargs,
 ) -> plt.Figure:
-    min_value = plot_data[plot_col].min()
-    max_value = plot_data[plot_col].max()
-    cmap = plt.cm.get_cmap('coolwarm')
-    norm = mcolors.Normalize(vmin=min_value, vmax=max_value)
-    cmap.set_under('lightgray')
-
     fig, ax = plt.subplots()
-    plot_data[plot_col] = plot_data[plot_col].fillna(min_value - 1)
-    plot_data.plot(ax=ax, edgecolor='k', lw=1, column=plot_col, cmap=cmap, norm=norm, **kwargs)
+    if use_defaults:
+        if 'cmap' in kwargs:
+            cmap = kwargs.pop('cmap')
+        else:
+            cmap = plt.cm.get_cmap('coolwarm')
+        if 'norm' in kwargs:
+            norm = kwargs.pop('norm')
+            try:
+                min_val = norm.vmin
+            except AttributeError as e:
+                print('Expected user provided norm to have a vmin attribute')
+                raise e
+        else:
+            min_val = plot_data[plot_col].min()
+            max_val = plot_data[plot_col].max()
+            norm = mcolors.Normalize(vmin=min_val, vmax=max_val)
+        cmap.set_under(colour_for_na)
+        plot_data[plot_col] = plot_data[plot_col].fillna(min_val - 1)
+        plot_data.plot(ax=ax, column=plot_col, cmap=cmap, norm=norm, **kwargs)
+    else:
+        plot_data.plot(ax=ax, column=plot_col, **kwargs)
     ax.set_axis_off()
     plt.show()
     return fig
